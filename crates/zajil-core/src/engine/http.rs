@@ -355,7 +355,7 @@ impl Engine {
     /// Sends a request with `send`, and again after a growing wait while it
     /// fails for a reason that may pass: a connection that could not be
     /// made or broke, a timeout, `5xx`, `408 Request Timeout` or `429 Too
-    /// Many Requests`. A `429` waits for its `Retry-After` (seconds or an
+    /// Many Requests`. A `429` or `503` waits for its `Retry-After` (seconds or an
     /// HTTP date); one that asks for more than
     /// [`crate::retry::LONGEST_RETRY_AFTER`] is not waited for
     /// ([`Error::ServerBusy`]). After `max_failures` failures in a row the
@@ -375,9 +375,14 @@ impl Engine {
                 () = attempt.stop.requested() => return Err(Error::Stopped { state_file: None }),
             };
             let (reason, asked) = match &result {
-                Ok(response) if response.status() == StatusCode::TOO_MANY_REQUESTS => {
-                    let asked = header_str(response.headers(), header::RETRY_AFTER)
-                        .and_then(|v| crate::retry::retry_after(v, SystemTime::now()));
+                Ok(response)
+                    if matches!(
+                        response.status(),
+                        StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE
+                    ) =>
+                {
+                    let asked =
+                        crate::retry::retry_after_header(response.headers(), SystemTime::now());
                     if let Some(wait) =
                         asked.filter(|&wait| wait > crate::retry::LONGEST_RETRY_AFTER)
                     {
@@ -400,10 +405,13 @@ impl Engine {
             }
             let wait = asked.unwrap_or_else(|| crate::retry::backoff(attempt.failures));
             if let Ok(response) = &result
-                && response.status() == StatusCode::TOO_MANY_REQUESTS
+                && matches!(
+                    response.status(),
+                    StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE
+                )
             {
                 on_event(Event::ServerBusy {
-                    status: 429,
+                    status: response.status().as_u16(),
                     connections: 1,
                     wait: Some(wait),
                 });

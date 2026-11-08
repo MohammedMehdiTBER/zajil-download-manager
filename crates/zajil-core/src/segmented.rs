@@ -40,7 +40,7 @@
 //! timeout, `5xx`, `408`) gives its segment back with a wait that grows
 //! each time, with a random part; after `max_failures` failures in a row
 //! (by default [`retry::MAX_FAILURES`]) without progress the segment is given up and the download stops,
-//! resumable. A `429` makes every connection wait for `Retry-After`; a `429`
+//! resumable. A `429` and `503` pause new requests for `Retry-After`; a `429`
 //! or a `403` while other connections work means the server limits
 //! connections, so the limit drops to the connections it accepted.
 //!
@@ -549,7 +549,7 @@ enum Message {
     /// The segment starting at `segment` was split; the new one starts at
     /// `at`.
     Split { segment: u64, at: u64 },
-    /// The server answered `status` (`403` or `429`).
+    /// The server answered `status` (`403`, `429` or `503`).
     ServerBusy {
         status: u16,
         connections: usize,
@@ -1162,6 +1162,10 @@ async fn request_range(
             too_many_requests(ctx, id, start, &response);
             None
         }
+        StatusCode::SERVICE_UNAVAILABLE => {
+            service_unavailable(ctx, id, start, &response);
+            None
+        }
         StatusCode::FORBIDDEN => {
             let mut board = ctx.board();
             if board.active > 1 {
@@ -1196,6 +1200,43 @@ async fn request_range(
             None
         }
     }
+}
+
+/// `503 Service Unavailable`: honor `Retry-After` when supplied and pause
+/// new requests while the server recovers. Without it, use the growing wait.
+fn service_unavailable(ctx: &Ctx, id: usize, start: u64, response: &Response) {
+    let now = Instant::now();
+    let asked = retry::retry_after_header(response.headers(), SystemTime::now());
+    let mut board = ctx.board();
+    if let Some(wait) = asked.filter(|&wait| wait > retry::LONGEST_RETRY_AFTER) {
+        board.fail(
+            Some(start),
+            format!(
+                "the server asks to wait {} s before more requests; resume the download later",
+                wait.as_secs()
+            ),
+        );
+        return;
+    }
+    let failures = board
+        .index_of(start)
+        .map_or(0, |index| board.live[index].failures);
+    let wait = asked.unwrap_or_else(|| retry::backoff(failures.saturating_add(1)));
+    board.pause_until = board.pause_until.max(now.checked_add(wait));
+    let connections = board.limit;
+    board.retry_later(
+        id,
+        start,
+        "the server answered 503 Service Unavailable".into(),
+        now,
+        Some(wait),
+    );
+    drop(board);
+    let _ = ctx.events.send(Message::ServerBusy {
+        status: 503,
+        connections,
+        wait: Some(wait),
+    });
 }
 
 /// `429 Too Many Requests`: no request to the server before its

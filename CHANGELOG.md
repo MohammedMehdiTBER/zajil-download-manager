@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- **استجابة 503 المؤقتة**: زيد الحد الافتراضي لإعادة المحاولة من 5 إلى 10 مرات، وصار المحرك يحترم `Retry-After` عند 503 كما يفعل مع 429، بما في ذلك طلبات التنزيل المقسّم.
 - **«Batch download» saved a video site's pages, not their videos** (#332, found and first fixed by @MohammedFattay): a pattern of YouTube `watch` links came out as `watch (1).html` to `watch (12).html`. A pattern whose links are the big video sites' pages is now refused before anything is added, saying how many of its links are such pages, and pointing to «Add link», which reads a video or a playlist in «Video quality». The sites' list is one file now, `apps/desktop/src/lib/videoPages.json`, read by the page and by Rust. Files on those sites still go in a batch, and `zajil batch` is unchanged.
 
 ## [1.2.3] - 2026-11-01

@@ -4,6 +4,8 @@
 use std::hash::{BuildHasher, RandomState};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use reqwest::header::{self, HeaderMap};
+
 use crate::http_date;
 
 /// The wait before the first retry is between half of this and this.
@@ -15,7 +17,7 @@ pub const LONGEST_WAIT: Duration = Duration::from_secs(30);
 /// A segment whose connection failed this many times in a row, without
 /// writing anything in between, is given up (the download stops and can be
 /// resumed later).
-pub const MAX_FAILURES: u32 = 5;
+pub const MAX_FAILURES: u32 = 10;
 
 /// A server asking to wait longer than this is not waited for: the download
 /// stops and can be resumed later.
@@ -70,6 +72,15 @@ pub fn retry_after(value: &str, now: SystemTime) -> Option<Duration> {
     Some(Duration::from_secs(
         u64::try_from(at.saturating_sub(now)).unwrap_or(0),
     ))
+}
+
+/// Reads the server's `Retry-After` header, as delay-seconds or an HTTP
+/// date. Invalid or absent headers do not override the local backoff.
+pub fn retry_after_header(headers: &HeaderMap, now: SystemTime) -> Option<Duration> {
+    headers
+        .get(header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| retry_after(value, now))
 }
 
 #[cfg(test)]

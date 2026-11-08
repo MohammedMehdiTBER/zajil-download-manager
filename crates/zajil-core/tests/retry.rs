@@ -182,7 +182,12 @@ async fn a_server_that_always_breaks_at_the_same_place_is_given_up() {
 
     // How far each try got.
     let mut reached = vec![0];
-    let err = engine()
+    let five_tries = Engine::new(Options {
+        max_failures: 5,
+        ..Options::default()
+    })
+    .unwrap();
+    let err = five_tries
         .download(
             &server.url("/f.bin"),
             dir.path(),
@@ -223,7 +228,12 @@ async fn a_server_error_on_every_try_gives_up_after_five() {
     );
     let dir = tempfile::tempdir().unwrap();
 
-    let err = engine()
+    let five_tries = Engine::new(Options {
+        max_failures: 5,
+        ..Options::default()
+    })
+    .unwrap();
+    let err = five_tries
         .download(&server.url("/f.bin"), dir.path(), &mut |_| {})
         .await
         .unwrap_err();
@@ -234,6 +244,61 @@ async fn a_server_error_on_every_try_gives_up_after_five() {
     );
     assert_eq!(server.gets("/f.bin").len(), 5);
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+}
+
+#[tokio::test]
+async fn the_default_retries_transient_server_errors_beyond_five_tries() {
+    let server = TestServer::http();
+    let data = random_bytes(1_000, 310);
+    server.put(
+        "/f.bin",
+        FileSpec::new(data.clone()).fail_first(vec![failure(503, None); 5]),
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let mut events = Vec::new();
+
+    let done = engine()
+        .download(&server.url("/f.bin"), dir.path(), &mut |event| {
+            events.push(event)
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(fs::read(&done.file).unwrap(), data);
+    assert_eq!(server.gets("/f.bin").len(), 6);
+    assert_eq!(retries(&events), 5);
+}
+
+#[tokio::test]
+async fn service_unavailable_waits_for_retry_after() {
+    let server = TestServer::http();
+    server.put(
+        "/f.bin",
+        FileSpec::new(random_bytes(1_000, 311)).fail_first(vec![failure(503, Some(1))]),
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let mut events = Vec::new();
+
+    let done = engine()
+        .download(&server.url("/f.bin"), dir.path(), &mut |event| {
+            events.push(event)
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(server.gets("/f.bin").len(), 2);
+    assert!(
+        server.gets("/f.bin")[1].at - server.gets("/f.bin")[0].at >= Duration::from_millis(900)
+    );
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::ServerBusy {
+            status: 503,
+            wait: Some(wait),
+            ..
+        } if *wait == Duration::from_secs(1)
+    )));
+    assert_eq!(fs::read(&done.file).unwrap().len(), 1_000);
 }
 
 #[tokio::test]
@@ -265,24 +330,26 @@ async fn one_try_means_no_retry() {
 #[tokio::test]
 async fn a_retry_after_longer_than_ten_minutes_is_not_waited_for() {
     let server = TestServer::http();
-    server.put(
-        "/f.bin",
-        FileSpec::new(random_bytes(1_000, 306)).fail_first(vec![failure(429, Some(3600))]),
-    );
-    let dir = tempfile::tempdir().unwrap();
-    let started = Instant::now();
+    for (status, path, seed) in [(429, "/429.bin", 306), (503, "/503.bin", 312)] {
+        server.put(
+            path,
+            FileSpec::new(random_bytes(1_000, seed)).fail_first(vec![failure(status, Some(3600))]),
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let started = Instant::now();
 
-    let err = engine()
-        .download(&server.url("/f.bin"), dir.path(), &mut |_| {})
-        .await
-        .unwrap_err();
+        let err = engine()
+            .download(&server.url(path), dir.path(), &mut |_| {})
+            .await
+            .unwrap_err();
 
-    assert!(
-        matches!(err, Error::ServerBusy { wait } if wait == Duration::from_secs(3600)),
-        "{err}"
-    );
-    assert!(started.elapsed() < Duration::from_secs(5));
-    assert_eq!(server.gets("/f.bin").len(), 1);
+        assert!(
+            matches!(err, Error::ServerBusy { wait } if wait == Duration::from_secs(3600)),
+            "{err}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert_eq!(server.gets(path).len(), 1);
+    }
 }
 
 #[tokio::test]

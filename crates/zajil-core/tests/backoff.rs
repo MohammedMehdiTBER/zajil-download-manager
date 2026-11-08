@@ -11,8 +11,13 @@ use zajil_testserver::{Failure, FileSpec, RequestRecord, TestServer, random_byte
 const MIB: usize = 1024 * 1024;
 
 fn engine(connections: usize) -> Engine {
+    engine_with_failures(connections, Options::default().max_failures)
+}
+
+fn engine_with_failures(connections: usize, max_failures: u32) -> Engine {
     Engine::new(Options {
         connections,
+        max_failures,
         ..Options::default()
     })
     .unwrap()
@@ -202,7 +207,7 @@ async fn a_segment_that_keeps_failing_is_given_up_after_growing_waits() {
     );
     let dir = tempfile::tempdir().unwrap();
 
-    let err = engine(4)
+    let err = engine_with_failures(4, 5)
         .download(&server.url("/f.bin"), dir.path(), &mut |_| {})
         .await
         .unwrap_err();
@@ -238,9 +243,8 @@ async fn a_segment_that_keeps_failing_is_given_up_after_growing_waits() {
     assert_eq!(fs::read(&done.unwrap().file).unwrap(), data);
 }
 
-/// A server asking for a wait longer than ten minutes is not waited for.
 #[tokio::test]
-async fn a_very_long_retry_after_stops_the_download_at_once() {
+async fn service_unavailable_waits_before_retrying_a_segment() {
     let server = TestServer::http();
     let data = random_bytes(4 * MIB, 84);
     server.put(
@@ -248,20 +252,71 @@ async fn a_very_long_retry_after_stops_the_download_at_once() {
         FileSpec::new(data)
             .cut_after(MIB as u64 / 2, 1)
             .fail_range_requests(Failure {
-                status: 429,
-                retry_after: Some(3600),
+                status: 503,
+                retry_after: Some(1),
             }),
     );
     let dir = tempfile::tempdir().unwrap();
+    let mut events = Vec::new();
 
-    let started = std::time::Instant::now();
-    let err = engine(4)
-        .download(&server.url("/f.bin"), dir.path(), &mut |_| {})
+    let err = engine_with_failures(4, 3)
+        .download(&server.url("/f.bin"), dir.path(), &mut |event| {
+            events.push(event)
+        })
         .await
         .unwrap_err();
-    assert!(started.elapsed() < Duration::from_secs(5));
-    let Error::Interrupted { reason, .. } = err else {
-        panic!("expected an interruption, got {err:?}");
-    };
-    assert!(reason.contains("3600 s"), "{reason}");
+    assert!(matches!(err, Error::Interrupted { .. }), "{err}");
+
+    let gets = server.gets("/f.bin");
+    let range_failures = with_status(&gets, 503);
+    let first_range = range_failures
+        .first()
+        .and_then(|record| record.range.as_ref())
+        .unwrap();
+    let same_segment: Vec<_> = range_failures
+        .iter()
+        .filter(|record| record.range.as_ref() == Some(first_range))
+        .collect();
+    assert!(same_segment.len() >= 2, "{same_segment:?}");
+    for pair in same_segment.windows(2) {
+        assert!(
+            pair[1].at - pair[0].at >= Duration::from_millis(900),
+            "{pair:?}"
+        );
+    }
+    assert!(
+        busy(&events)
+            .iter()
+            .any(|&(status, _, wait)| { status == 503 && wait == Some(Duration::from_secs(1)) })
+    );
+}
+
+/// A server asking for a wait longer than ten minutes is not waited for.
+#[tokio::test]
+async fn a_very_long_retry_after_stops_the_download_at_once() {
+    for (status, seed) in [(429, 84), (503, 85)] {
+        let server = TestServer::http();
+        let data = random_bytes(4 * MIB, seed);
+        server.put(
+            "/f.bin",
+            FileSpec::new(data)
+                .cut_after(MIB as u64 / 2, 1)
+                .fail_range_requests(Failure {
+                    status,
+                    retry_after: Some(3600),
+                }),
+        );
+        let dir = tempfile::tempdir().unwrap();
+
+        let started = std::time::Instant::now();
+        let err = engine(4)
+            .download(&server.url("/f.bin"), dir.path(), &mut |_| {})
+            .await
+            .unwrap_err();
+        assert!(started.elapsed() < Duration::from_secs(5));
+        let Error::Interrupted { reason, .. } = err else {
+            panic!("expected an interruption, got {err:?}");
+        };
+        assert!(reason.contains("3600 s"), "{reason}");
+    }
 }

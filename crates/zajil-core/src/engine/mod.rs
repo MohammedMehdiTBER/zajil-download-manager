@@ -168,9 +168,9 @@ pub enum Event {
     /// what remained of the slowest segment. The segment that starts at
     /// `segment` now ends just before `at`, where a new one starts.
     Split { segment: u64, at: u64 },
-    /// The server answered `status` (`403 Forbidden` or `429 Too Many
-    /// Requests`): at most `connections` connections from now on, and no
-    /// new request for `wait`.
+    /// The server answered `status` (`403 Forbidden`, `429 Too Many
+    /// Requests` or `503 Service Unavailable`): at most `connections`
+    /// connections from now on, and no new request for `wait`.
     ServerBusy {
         status: u16,
         connections: usize,
