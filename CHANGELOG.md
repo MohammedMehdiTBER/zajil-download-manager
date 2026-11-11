@@ -7,6 +7,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- **The desktop main window reflows while being resized** on Windows, macOS and Linux: the navigation column now gives up space smoothly, the download pane can shrink without forcing the whole grid wider, and the toolbar search field moves onto its own row in compact windows. The window can be resized down to 720 × 480 logical pixels.
+
+### Tests
+
+- **The queue-level speed-limit test no longer mixes runner settings with dynamic segment hand-offs**: it checks the shared program limit across two concurrent downloads with one connection each. Concurrent token-bucket readers remain covered separately by the core limit tests.
+
+
 ## [1.2.4] - 2026-11-11
 
 Fixes, most of them reported or sent by users and contributors during the stability period of 1.2.x. Four came from @MohammedMehdiTBER's review of the desktop app on the three systems (#369, #371, #379, #380).
