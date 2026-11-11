@@ -138,7 +138,11 @@ async fn the_runner_applies_the_limits_of_the_queues_file() {
         })
         .unwrap();
     let clock = ManualClock::new();
-    let runner = Runner::new(engine(&clock, 4), store.clone()).poll(Duration::from_millis(50));
+    // This test covers the runner wiring the program-wide setting into
+    // two simultaneous downloads. One connection per download keeps it
+    // independent of dynamic segment hand-offs; concurrent bucket readers
+    // are covered directly in limit.rs.
+    let runner = Runner::new(engine(&clock, 1), store.clone()).poll(Duration::from_millis(50));
     let summary = runner.run(&Stop::new(), &mut |_| {}).await.unwrap();
     assert_eq!(summary.finished, 2);
     assert_rate(8 * MIB, clock.now(), MIB);
