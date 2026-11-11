@@ -350,4 +350,24 @@
     color: var(--muted);
     background: var(--surface);
   }
+
+  /* The search field gets its own row on compact windows instead of
+     forcing the toolbar or the main grid wider than the window. */
+  @media (max-width: 900px) {
+    .toolbar {
+      gap: 2px;
+      padding-inline: 6px;
+    }
+    .tb {
+      min-width: 52px;
+      padding-inline: 2px;
+    }
+    .search {
+      flex: 1 1 100%;
+      width: 100%;
+      min-width: 0;
+      margin-inline-start: 0;
+    }
+  }
+
 </style>
