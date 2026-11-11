@@ -1188,12 +1188,16 @@ import { patchRows } from "./lib/progressRows";
     position: relative;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    min-width: 0;
     height: 100%;
   }
   .body {
     flex: 1;
     display: grid;
-    grid-template-columns: 228px 1fr;
+    /* Let the navigation give up width before the download list overflows. */
+    grid-template-columns: clamp(152px, 20vw, 228px) minmax(0, 1fr);
+    min-width: 0;
     min-height: 0;
   }
   .main {
