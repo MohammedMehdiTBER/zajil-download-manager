@@ -789,8 +789,9 @@ mod tests {
         let base = read("tauri.conf.json")["app"]["windows"][0].clone();
         assert_eq!(base["width"], 1180);
         assert_eq!(base["height"], 760);
-        assert_eq!(base["minWidth"], 900);
-        assert_eq!(base["minHeight"], 560);
+        assert_eq!(base["minWidth"], 720);
+        assert_eq!(base["minHeight"], 480);
+        assert_eq!(base["resizable"], true);
         for (name, own) in [
             (
                 "tauri.macos.conf.json",
