@@ -193,10 +193,11 @@ pub(crate) fn open_page<R: tauri::Runtime>(
         .title(title)
         .inner_size(width, height + missing)
         .min_inner_size(least.0, least.1 + missing)
+        .decorations(false)
         .visible(!add)
         .resizable(true)
-        .maximizable(false)
-        .minimizable(false)
+        .maximizable(true)
+        .minimizable(true)
         .center()
         .focused(true)
         .build()?;
@@ -432,9 +433,10 @@ fn refill<R: tauri::Runtime>(handle: &tauri::AppHandle<R>, kind: Kind, delay: st
         )
         .title("Zajil")
         .inner_size(width, height)
+        .decorations(false)
         .resizable(true)
-        .maximizable(false)
-        .minimizable(false)
+        .maximizable(true)
+        .minimizable(true)
         .center()
         .visible(false)
         .focused(false)
@@ -756,8 +758,7 @@ mod tests {
             serde_json::json!([
                 "core:event:default",
                 "core:window:allow-set-title",
-                "core:window:allow-set-size",
-                "dialog:allow-message"
+                "core:window:allow-set-size"
             ])
         );
     }
@@ -795,7 +796,7 @@ mod tests {
         for (name, own) in [
             (
                 "tauri.macos.conf.json",
-                serde_json::json!({"titleBarStyle": "Overlay", "hiddenTitle": true}),
+                serde_json::json!({"decorations": false}),
             ),
             (
                 "tauri.windows.conf.json",
