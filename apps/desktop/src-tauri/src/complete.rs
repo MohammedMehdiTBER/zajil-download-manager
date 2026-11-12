@@ -311,7 +311,7 @@ mod tests {
         );
         assert_eq!(
             capability["permissions"],
-            serde_json::json!(["core:event:default", "dialog:allow-message"])
+            serde_json::json!(["core:event:default"])
         );
     }
 }
