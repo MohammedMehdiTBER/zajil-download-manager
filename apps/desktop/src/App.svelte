@@ -3,7 +3,7 @@
   import { onMount, tick } from "svelte";
   import { openError } from "./lib/openError";
   import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
-  import { ask, message, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import { message, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import Tree, { type Filter, type View } from "./lib/components/Tree.svelte";
   import { inSection } from "./lib/sections";
   import Toolbar, { type ToolAction } from "./lib/components/Toolbar.svelte";
@@ -45,6 +45,8 @@ import { patchRows } from "./lib/progressRows";
   import ExtensionBar from "./lib/components/ExtensionBar.svelte";
   import VideoBar from "./lib/components/VideoBar.svelte";
   import AboutDialog from "./lib/components/AboutDialog.svelte";
+  import ConfirmPrompt from "./lib/components/ConfirmPrompt.svelte";
+  import { createConfirmation } from "./lib/confirm";
   import { num, size, speed } from "./lib/format";
   import type { Snapshot } from "./lib/bindings/Snapshot";
   import type { DetailsView } from "./lib/bindings/DetailsView";
@@ -94,6 +96,8 @@ import { patchRows } from "./lib/progressRows";
   let keepFolders = $state(false);
   // Said to screen readers when a download ends: not each progress event.
   let announcement = $state("");
+  const confirmation = createConfirmation();
+  const { prompt } = confirmation;
   let lastStatus = new Map<number, DownloadView["status"]>();
   let lastQueue = new Map<number, string>();
   // The names test page, loaded only in a ui-test build.
@@ -399,7 +403,7 @@ import { patchRows } from "./lib/progressRows";
     }
     await refresh();
   }
-  const dialogOpen = $derived(Boolean(refreshing || deleteAsk || aboutOpen));
+  const dialogOpen = $derived(Boolean(refreshing || deleteAsk || aboutOpen || $prompt));
   // The table is on screen: what the selection buttons act on is seen
   // (review of #96: Delete removed rows hidden behind the settings).
   const tableShown = $derived(view === "list" && !details);
@@ -497,12 +501,12 @@ import { patchRows } from "./lib/progressRows";
   async function confirmThen(question: string, needed: boolean, then: () => Promise<void>) {
     if (needed) {
       // The buttons in the user's language, not the system's Yes/No.
-      const yes = await ask(question, {
+      const yes = await confirmation.ask({
         title: locale.t("app-name"),
-        kind: "warning",
+        message: question,
         okLabel: locale.t("confirm-remove"),
         cancelLabel: locale.t("confirm-cancel"),
-      }).catch(() => false);
+      });
       if (!yes) return;
     }
     await then();
@@ -645,12 +649,12 @@ import { patchRows } from "./lib/progressRows";
     try {
       if (await api.openDownload(id, folder)) return;
       const name = snapshot.downloads.find((x) => x.id === id)?.name ?? "";
-      const yes = await ask(locale.t("open-code-question", { name }), {
+      const yes = await confirmation.ask({
         title: locale.t("app-name"),
-        kind: "warning",
+        message: locale.t("open-code-question", { name }),
         okLabel: locale.t("open-code-ok"),
         cancelLabel: locale.t("confirm-cancel"),
-      }).catch(() => false);
+      });
       if (yes) await api.openDownload(id, folder, true);
     } catch (e) {
       failed = openError(e, (k) => locale.t(k));
@@ -698,12 +702,12 @@ import { patchRows } from "./lib/progressRows";
     const running = active.length;
     if (running > 0) {
       quitting = true;
-      const yes = await ask(locale.t("quit-question", { count: running }), {
+      const yes = await confirmation.ask({
         title: locale.t("app-name"),
-        kind: "warning",
+        message: locale.t("quit-question", { count: running }),
         okLabel: locale.t("quit-ok"),
         cancelLabel: locale.t("confirm-cancel"),
-      }).catch(() => false);
+      });
       quitting = false;
       if (!yes) return;
     }
@@ -1169,6 +1173,7 @@ import { patchRows } from "./lib/progressRows";
       {#if selected.length > 0}<span class="end">{locale.t("footer-selected", { number: num(locale.lang, locale.digits, selected.length, 0) })}</span>{/if}
     </footer>
     {#if aboutOpen}<AboutDialog onclose={() => (aboutOpen = false)} />{/if}
+    {#if $prompt}<ConfirmPrompt {...$prompt} onanswer={confirmation.answer} />{/if}
     <div class="visually-hidden" aria-live="polite" role="status">{announcement}</div>
   </div>
 {/if}
