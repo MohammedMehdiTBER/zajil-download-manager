@@ -339,6 +339,7 @@ pub fn run() {
             }
             // The add windows' own permissions (`windows.rs`), and they
             // close with the main window (review of #104).
+            tauri_app.add_capability(include_str!("../runtime-capabilities/chrome.json"))?;
             tauri_app.add_capability(windows::CAPABILITY)?;
             tauri_app.add_capability(video::CAPABILITY)?;
             tauri_app.add_capability(batch::CAPABILITY)?;
@@ -566,6 +567,7 @@ fn handlers<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Sen
         schedule::countdown,
         schedule::cancel_after,
         schedule::choose_after_open,
+        schedule::confirm_after_open,
         schedule::clear_after_open,
         complete::set_show_complete,
         complete::complete_info,
@@ -689,6 +691,7 @@ fn handlers<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Sen
         schedule::countdown,
         schedule::cancel_after,
         schedule::choose_after_open,
+        schedule::confirm_after_open,
         schedule::clear_after_open,
         complete::set_show_complete,
         complete::complete_info,
