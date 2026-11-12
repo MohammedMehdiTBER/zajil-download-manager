@@ -19,8 +19,8 @@ use zajil_core::queue::{Item, QueueEvent, Status, shown_url};
 
 use crate::App;
 
-/// The complete windows' capability: Zajil's events and the yes-or-no
-/// question before a program opens. Added when the app starts.
+/// The complete windows' capability: Zajil's events. App-drawn
+/// confirmation prompts need no native message-dialog permission.
 pub const CAPABILITY: &str = include_str!("../runtime-capabilities/complete.json");
 
 /// Each window's label is this and the download's id.
@@ -300,8 +300,7 @@ mod tests {
         assert!(Show::default().0.load(Ordering::Relaxed));
     }
 
-    /// The complete windows may listen and ask before a program opens, and
-    /// nothing more.
+    /// The complete windows may listen to events, and nothing more.
     #[test]
     fn the_complete_windows_have_only_their_own_permissions() {
         let capability: serde_json::Value = serde_json::from_str(CAPABILITY).unwrap();
