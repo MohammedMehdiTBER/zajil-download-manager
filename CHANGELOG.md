@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- **All app-owned desktop windows use Zajil's custom title bar and frame** across Windows, Linux and macOS. The minimize, maximize/restore and close controls share the main window's design; RTL reverses their order so close sits at the outer left edge.
+- **Confirmation prompts use the app's own modal design** in the main window, settings, progress and completion windows, and the schedule workflow. Native file and folder pickers remain system pickers.
+
+
 - **The desktop main window reflows while being resized** on Windows, macOS and Linux: the navigation column now gives up space smoothly, the download pane can shrink without forcing the whole grid wider, and the toolbar search field moves onto its own row in compact windows. The window can be resized down to 720 × 480 logical pixels.
 
 ### Tests
