@@ -778,9 +778,8 @@ mod tests {
         );
     }
 
-    /// The main window is the same on every system but for its title bar
-    /// (the design of #83): hidden under the page on macOS, none on Windows
-    /// and Linux, where the page draws it.
+    /// The main window uses the app-drawn title bar on every system;
+    /// OS decorations are disabled in all platform overlays.
     #[test]
     fn the_main_window_differs_by_system_only_in_its_title_bar() {
         let read = |name: &str| -> serde_json::Value {
@@ -793,6 +792,7 @@ mod tests {
         assert_eq!(base["minWidth"], 720);
         assert_eq!(base["minHeight"], 480);
         assert_eq!(base["resizable"], true);
+        assert_eq!(base["decorations"], false);
         for (name, own) in [
             (
                 "tauri.macos.conf.json",
