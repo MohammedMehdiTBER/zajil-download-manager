@@ -7,10 +7,10 @@
         "title": "Zajil",
         "width": 1180,
         "height": 760,
-        "minWidth": 900,
-        "minHeight": 560,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "minWidth": 720,
+        "minHeight": 480,
+        "resizable": true,
+        "decorations": false
       }
     ]
   }

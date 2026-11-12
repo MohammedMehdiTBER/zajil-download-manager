@@ -3,7 +3,7 @@
   import { onMount, tick } from "svelte";
   import { openError } from "./lib/openError";
   import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
-  import { ask, message, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import Tree, { type Filter, type View } from "./lib/components/Tree.svelte";
   import { inSection } from "./lib/sections";
   import Toolbar, { type ToolAction } from "./lib/components/Toolbar.svelte";
@@ -12,6 +12,7 @@
   import { MENU_BAR, commandKey } from "./lib/menus";
   import MenuBar from "./lib/components/MenuBar.svelte";
   import TitleBar from "./lib/components/TitleBar.svelte";
+  import WindowShell from "./lib/WindowShell.svelte";
   import ContextMenu from "./lib/components/ContextMenu.svelte";
   import DeleteAsk from "./lib/components/DeleteAsk.svelte";
   import Settings from "./lib/components/Settings.svelte";
@@ -45,6 +46,8 @@ import { patchRows } from "./lib/progressRows";
   import ExtensionBar from "./lib/components/ExtensionBar.svelte";
   import VideoBar from "./lib/components/VideoBar.svelte";
   import AboutDialog from "./lib/components/AboutDialog.svelte";
+  import ConfirmPrompt from "./lib/components/ConfirmPrompt.svelte";
+  import { createConfirmation } from "./lib/confirm";
   import { num, size, speed } from "./lib/format";
   import type { Snapshot } from "./lib/bindings/Snapshot";
   import type { DetailsView } from "./lib/bindings/DetailsView";
@@ -94,6 +97,8 @@ import { patchRows } from "./lib/progressRows";
   let keepFolders = $state(false);
   // Said to screen readers when a download ends: not each progress event.
   let announcement = $state("");
+  const confirmation = createConfirmation();
+  const { prompt } = confirmation;
   let lastStatus = new Map<number, DownloadView["status"]>();
   let lastQueue = new Map<number, string>();
   // The names test page, loaded only in a ui-test build.
@@ -399,7 +404,7 @@ import { patchRows } from "./lib/progressRows";
     }
     await refresh();
   }
-  const dialogOpen = $derived(Boolean(refreshing || deleteAsk || aboutOpen));
+  const dialogOpen = $derived(Boolean(refreshing || deleteAsk || aboutOpen || $prompt));
   // The table is on screen: what the selection buttons act on is seen
   // (review of #96: Delete removed rows hidden behind the settings).
   const tableShown = $derived(view === "list" && !details);
@@ -497,12 +502,12 @@ import { patchRows } from "./lib/progressRows";
   async function confirmThen(question: string, needed: boolean, then: () => Promise<void>) {
     if (needed) {
       // The buttons in the user's language, not the system's Yes/No.
-      const yes = await ask(question, {
+      const yes = await confirmation.ask({
         title: locale.t("app-name"),
-        kind: "warning",
+        message: question,
         okLabel: locale.t("confirm-remove"),
         cancelLabel: locale.t("confirm-cancel"),
-      }).catch(() => false);
+      });
       if (!yes) return;
     }
     await then();
@@ -645,12 +650,12 @@ import { patchRows } from "./lib/progressRows";
     try {
       if (await api.openDownload(id, folder)) return;
       const name = snapshot.downloads.find((x) => x.id === id)?.name ?? "";
-      const yes = await ask(locale.t("open-code-question", { name }), {
+      const yes = await confirmation.ask({
         title: locale.t("app-name"),
-        kind: "warning",
+        message: locale.t("open-code-question", { name }),
         okLabel: locale.t("open-code-ok"),
         cancelLabel: locale.t("confirm-cancel"),
-      }).catch(() => false);
+      });
       if (yes) await api.openDownload(id, folder, true);
     } catch (e) {
       failed = openError(e, (k) => locale.t(k));
@@ -698,12 +703,12 @@ import { patchRows } from "./lib/progressRows";
     const running = active.length;
     if (running > 0) {
       quitting = true;
-      const yes = await ask(locale.t("quit-question", { count: running }), {
+      const yes = await confirmation.ask({
         title: locale.t("app-name"),
-        kind: "warning",
+        message: locale.t("quit-question", { count: running }),
         okLabel: locale.t("quit-ok"),
         cancelLabel: locale.t("confirm-cancel"),
-      }).catch(() => false);
+      });
       quitting = false;
       if (!yes) return;
     }
@@ -1045,31 +1050,36 @@ import { patchRows } from "./lib/progressRows";
 {#if NamesPage}
   <NamesPage />
 {:else if windowScene && windowSceneName}
-  <div class="scene" class:mac={onMac()}>
-    {#if windowSceneName === "complete"}<CompleteWindow scene={windowScene.complete} />
-    {:else if windowSceneName === "schedule"}<ScheduleWindow scene={windowScene.schedule} />
-    {:else if windowSceneName === "batch"}<BatchWindow scene={windowScene.batch} />
-    {:else}<GrabWindow scene={windowScene.grab} />{/if}
+  <div class="scene">
+    {#if windowSceneName === "complete"}
+      <WindowShell component={CompleteWindow} componentProps={{ scene: windowScene.complete }} titleKey="complete-title" />
+    {:else if windowSceneName === "schedule"}
+      <WindowShell component={ScheduleWindow} componentProps={{ scene: windowScene.schedule }} titleKey="schedule-title" />
+    {:else if windowSceneName === "batch"}
+      <WindowShell component={BatchWindow} componentProps={{ scene: windowScene.batch }} titleKey="batch-title" />
+    {:else}
+      <WindowShell component={GrabWindow} componentProps={{ scene: windowScene.grab }} titleKey="grab-title" />
+    {/if}
   </div>
 {:else if videoScene}
-  <div class="scene" class:mac={onMac()}><VideoWindow scene={videoScene} /></div>
+  <div class="scene"><WindowShell component={VideoWindow} componentProps={{ scene: videoScene }} titleKey="video-title" /></div>
 {:else if linkScene}
-  <div class="scene" class:mac={onMac()}><AddLink url="https://cdn.example.org/courses/rust/part-2.mp4" fromClipboard={true} onok={() => {}} oncancel={() => {}} /></div>
+  <div class="scene"><WindowShell component={AddLink} componentProps={{ url: "https://cdn.example.org/courses/rust/part-2.mp4", fromClipboard: true, onok: () => {}, oncancel: () => {} }} titleKey="addlink-title" /></div>
 {:else if progressScene}
-  <div class="scene" class:mac={onMac()}><ProgressWindow id={2} /></div>
+  <div class="scene"><WindowShell component={ProgressWindow} componentProps={{ id: 2 }} titleKey="progress-title" /></div>
 {:else if addScene}
-  <div class="scene" class:mac={onMac()}><AddDialog
-    url={addScene.url}
-    probe={addScene.probe}
-    error={null}
-    busy={false}
-    queues={snapshot.queues}
-    categories={snapshot.categories}
-    onadd={() => {}}
-    oncancel={() => {}}
-    onchoosefolder={async () => null}
-    onnewcategory={() => {}}
-  /></div>
+  <div class="scene"><WindowShell component={AddDialog} componentProps={{
+    url: addScene.url,
+    probe: addScene.probe,
+    error: null,
+    busy: false,
+    queues: snapshot.queues,
+    categories: snapshot.categories,
+    onadd: () => {},
+    oncancel: () => {},
+    onchoosefolder: async () => null,
+    onnewcategory: () => {},
+  }} titleKey="info-title" /></div>
 {:else}
   <div class="window">
     <header>
@@ -1169,31 +1179,31 @@ import { patchRows } from "./lib/progressRows";
       {#if selected.length > 0}<span class="end">{locale.t("footer-selected", { number: num(locale.lang, locale.digits, selected.length, 0) })}</span>{/if}
     </footer>
     {#if aboutOpen}<AboutDialog onclose={() => (aboutOpen = false)} />{/if}
+    {#if $prompt}<ConfirmPrompt {...$prompt} onanswer={confirmation.answer} />{/if}
     <div class="visually-hidden" aria-live="polite" role="status">{announcement}</div>
   </div>
 {/if}
 
 <style>
-  /* A window scene (the add, link and progress windows, drawn here for
-     the screenshots): on macOS the main window's own title bar is hidden
-     (#118), and the real windows have the system's above their content. */
+  /* Test scenes use the same custom title bar as their real windows. */
   .scene {
     height: 100%;
-  }
-  .scene.mac {
-    box-sizing: border-box;
-    padding-top: 28px;
+    min-height: 0;
   }
   .window {
     position: relative;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    min-width: 0;
     height: 100%;
   }
   .body {
     flex: 1;
     display: grid;
-    grid-template-columns: 228px 1fr;
+    /* Let the navigation give up width before the download list overflows. */
+    grid-template-columns: clamp(152px, 20vw, 228px) minmax(0, 1fr);
+    min-width: 0;
     min-height: 0;
   }
   .main {

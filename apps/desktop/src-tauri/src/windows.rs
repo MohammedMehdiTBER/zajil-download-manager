@@ -193,10 +193,11 @@ pub(crate) fn open_page<R: tauri::Runtime>(
         .title(title)
         .inner_size(width, height + missing)
         .min_inner_size(least.0, least.1 + missing)
+        .decorations(false)
         .visible(!add)
         .resizable(true)
-        .maximizable(false)
-        .minimizable(false)
+        .maximizable(true)
+        .minimizable(true)
         .center()
         .focused(true)
         .build()?;
@@ -432,9 +433,10 @@ fn refill<R: tauri::Runtime>(handle: &tauri::AppHandle<R>, kind: Kind, delay: st
         )
         .title("Zajil")
         .inner_size(width, height)
+        .decorations(false)
         .resizable(true)
-        .maximizable(false)
-        .minimizable(false)
+        .maximizable(true)
+        .minimizable(true)
         .center()
         .visible(false)
         .focused(false)
@@ -756,8 +758,7 @@ mod tests {
             serde_json::json!([
                 "core:event:default",
                 "core:window:allow-set-title",
-                "core:window:allow-set-size",
-                "dialog:allow-message"
+                "core:window:allow-set-size"
             ])
         );
     }
@@ -777,9 +778,8 @@ mod tests {
         );
     }
 
-    /// The main window is the same on every system but for its title bar
-    /// (the design of #83): hidden under the page on macOS, none on Windows
-    /// and Linux, where the page draws it.
+    /// The main window uses the app-drawn title bar on every system;
+    /// OS decorations are disabled in all platform overlays.
     #[test]
     fn the_main_window_differs_by_system_only_in_its_title_bar() {
         let read = |name: &str| -> serde_json::Value {
@@ -789,12 +789,14 @@ mod tests {
         let base = read("tauri.conf.json")["app"]["windows"][0].clone();
         assert_eq!(base["width"], 1180);
         assert_eq!(base["height"], 760);
-        assert_eq!(base["minWidth"], 900);
-        assert_eq!(base["minHeight"], 560);
+        assert_eq!(base["minWidth"], 720);
+        assert_eq!(base["minHeight"], 480);
+        assert_eq!(base["resizable"], true);
+        assert_eq!(base["decorations"], false);
         for (name, own) in [
             (
                 "tauri.macos.conf.json",
-                serde_json::json!({"titleBarStyle": "Overlay", "hiddenTitle": true}),
+                serde_json::json!({"decorations": false}),
             ),
             (
                 "tauri.windows.conf.json",

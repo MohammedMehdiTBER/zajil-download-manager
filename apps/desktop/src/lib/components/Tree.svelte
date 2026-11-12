@@ -309,4 +309,26 @@
     color: var(--faint);
     font-size: 12px;
   }
+
+  /* Keep navigation readable when the main window is narrowed. */
+  @media (max-width: 820px) {
+    .tree {
+      min-width: 0;
+      padding-inline: 4px;
+    }
+    .node {
+      gap: 4px;
+      padding-inline: 4px;
+    }
+    .l0 {
+      margin-inline-start: 14px;
+    }
+    .l1 {
+      margin-inline-start: 26px;
+    }
+    .n {
+      display: none;
+    }
+  }
+
 </style>

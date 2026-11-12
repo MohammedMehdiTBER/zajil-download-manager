@@ -1,4 +1,5 @@
 import { mount, type Component } from "svelte";
+import WindowShell from "./lib/WindowShell.svelte";
 import "./styles/app.css";
 import { completeApi, loadShow } from "./lib/completeApi";
 import { api } from "./lib/api";
@@ -40,11 +41,31 @@ async function draw(win: string | null) {
   if (__UI_TEST__) void import("./uitest/windows").then((test) => test.run(win));
   if (progress) {
     const { default: ProgressWindow } = await import("./windows/ProgressWindow.svelte");
-    mount(ProgressWindow, { target: target!, props: { id: Number(progress[1]) } });
+    mount(WindowShell, {
+      target: target!,
+      props: { component: ProgressWindow, componentProps: { id: Number(progress[1]) }, titleKey: "progress-title" },
+    });
   } else {
     const page = (win !== null && pages[win]) || (() => import("./App.svelte"));
     const { default: Window } = await page();
-    mount(Window, { target: target! });
+    // The floating drop target is a deliberately frameless 72 px utility.
+    if (win === "drop") mount(Window, { target: target! });
+    else {
+      const titles: Record<string, string> = {
+        "add-link": "addlink-title",
+        "add-info": "info-title",
+        schedule: "schedule-title",
+        complete: "complete-title",
+        video: "video-title",
+        batch: "batch-title",
+        grab: "grab-title",
+        settings: "settings-title",
+      };
+      mount(WindowShell, {
+        target: target!,
+        props: { component: Window, titleKey: titles[win ?? ""] ?? "app-title" },
+      });
+    }
   }
   // Drawn (timed with `ZAJIL_MEASURE=1`): at once, not at the next frame,
   // which a window behind another app may never get. The main page says

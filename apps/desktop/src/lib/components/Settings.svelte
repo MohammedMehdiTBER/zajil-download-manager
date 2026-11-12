@@ -20,7 +20,8 @@
   import { errorDetails, errorKey } from "../videoErrors";
   import type { VideoErrorView } from "../bindings/VideoErrorView";
   import type { FinishView } from "../bindings/FinishView";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import ConfirmPrompt from "./ConfirmPrompt.svelte";
+  import { createConfirmation } from "../confirm";
   import { loadDoubleClick, saveDoubleClick, type DoubleClick } from "../doubleClick";
 
   let {
@@ -61,6 +62,8 @@
     ["appearance", "c-sun"],
   ] as const;
   let section = $state<(typeof SECTIONS)[number][0]>("general");
+  const confirmation = createConfirmation();
+  const { prompt } = confirmation;
 
   // What a double-click on a finished download does.
   const DOUBLE = [
@@ -311,12 +314,12 @@
     }
   }
   async function removeTools() {
-    const yes = await ask(locale.t("settings-video-tools-remove-question"), {
+    const yes = await confirmation.ask({
       title: locale.t("settings-video-tools"),
-      kind: "warning",
+      message: locale.t("settings-video-tools-remove-question"),
       okLabel: locale.t("settings-video-tools-remove"),
       cancelLabel: locale.t("confirm-cancel"),
-    }).catch(() => false);
+    });
     if (!yes) return;
     try {
       await api.videoToolsRemove();
@@ -694,6 +697,7 @@
   {/if}
   </div>
 </section>
+{#if $prompt}<ConfirmPrompt {...$prompt} onanswer={confirmation.answer} />{/if}
 
 <style>
   .sub {

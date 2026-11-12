@@ -4,32 +4,14 @@
   import Icon from "./Icon.svelte";
   import Mark from "./Mark.svelte";
   import { locale } from "../i18n.svelte";
-  import { onMac } from "../keys";
-
-  // The main window's title bar (the design of #83): the logo and «زاجِل
-  // لإدارة التحميل» always on the side away from the window's buttons
-  // (the owner's choice, 2026-11-01), so the two never crowd each other.
-  // The window is dragged by it and a double-click maximizes it
-  // (`data-tauri-drag-region`).
-  // - macOS: the system's bar is hidden under the page (`Overlay`); its
-  //   coloured buttons are on the left, or on the right on a Mac whose
-  //   first language reads right to left. The logo takes the other side.
-  // - Windows and Linux: the window has no system frame
-  //   (`tauri.windows.conf.json`, `tauri.linux.conf.json`): the minimize,
-  //   maximize and close buttons are here, at the end of the reading
-  //   direction, and the logo at its start. Close goes the way the
-  //   system's does (into the tray, #109).
-  const mac = onMac();
-  // The Mac's coloured buttons follow the system's first language, not
-  // Zajil's: on the right when it reads right to left.
-  const buttonsRight = mac && /^(ar|he|fa|ur|ps|sd|ug|yi|dv|ckb)(-|$)/i.test(navigator.language);
-  // Where the logo goes: opposite the buttons.
-  const brandRight = $derived(mac ? !buttonsRight : locale.dir === "rtl");
+  // One title-bar implementation is used by every app-owned window.
+  // The controls reverse as a group in RTL so the close button is outermost.
+  let { titleKey = "app-title" }: { titleKey?: string } = $props();
+  const brandRight = $derived(locale.dir === "rtl");
   const win = getCurrentWindow();
   let maximized = $state(false);
 
   onMount(() => {
-    if (mac) return;
     let unlisten: (() => void) | undefined;
     const check = () => void win.isMaximized().then((m) => (maximized = m), () => {});
     check();
@@ -41,13 +23,12 @@
 <!-- "deep": the logo and the name drag too; the buttons do not. -->
 <!-- Laid out left to right, the sides chosen above; the brand reads in
      the language's own direction. -->
-<div class="titlebar" class:mac class:buttons-right={buttonsRight} class:brand-right={brandRight} dir="ltr" data-tauri-drag-region="deep">
+<div class="titlebar" class:brand-right={brandRight} dir="ltr" data-tauri-drag-region="deep">
   <span class="brand" dir={locale.dir}>
     <Mark size={18} />
-    <span class="name">{locale.t("app-title")}</span>
+    <span class="name">{locale.t(titleKey)}</span>
   </span>
-  {#if !mac}
-    <span class="controls">
+  <span class="controls">
       <button class="ctl" aria-label={locale.t("win-minimize")} title={locale.t("win-minimize")} onclick={() => void win.minimize()}>
         <Icon name="minus" size={15} />
       </button>
@@ -62,8 +43,7 @@
       <button class="ctl close" aria-label={locale.t("win-close")} title={locale.t("win-close")} onclick={() => void win.close()}>
         <Icon name="x" size={16} />
       </button>
-    </span>
-  {/if}
+  </span>
 </div>
 
 <style>
@@ -78,41 +58,37 @@
     -webkit-user-select: none;
     flex: none;
   }
-  /* macOS: room for the coloured buttons on their side: the left, or the
-     right on a Mac in Arabic (a user's report, 2026-10-30: they covered
-     the logo). */
-  .titlebar.mac {
-    height: 30px;
-    padding-left: 80px;
-  }
-  .titlebar.mac.buttons-right {
-    padding-left: 12px;
-    padding-right: 80px;
-  }
   .brand-right .brand {
+    /* The bar itself is LTR; push the RTL label to the far right. */
     margin-left: auto;
   }
   .brand {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
     font-size: 13px;
     font-weight: 600;
     color: var(--ink);
   }
-  /* Windows and Linux: the window's buttons at the end of the reading
-     direction, flush with the window's edge: on the right in English, on
-     the left in Arabic. */
+  .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .controls {
     display: flex;
     height: 100%;
-    margin-left: auto;
-    margin-right: -12px;
+    margin-inline-start: auto;
+    margin-inline-end: -12px;
+    flex: none;
   }
+  /* In RTL, reverse the controls too: close is the leftmost outer button. */
   .brand-right .controls {
     order: -1;
-    margin-left: -12px;
-    margin-right: 0;
+    margin-inline-start: -12px;
+    margin-inline-end: 0;
+    flex-direction: row-reverse;
   }
   .ctl {
     width: 46px;

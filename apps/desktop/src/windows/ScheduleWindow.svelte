@@ -3,6 +3,7 @@
   import Icon from "../lib/components/Icon.svelte";
   import FileName from "../lib/components/FileName.svelte";
   import StatusChip from "../lib/components/StatusChip.svelte";
+  import ConfirmPrompt from "../lib/components/ConfirmPrompt.svelte";
   import { api } from "../lib/api";
   import { scheduleApi } from "../lib/scheduleApi";
   import { startWindow } from "../lib/windowStart";
@@ -12,6 +13,7 @@
   import type { AfterChoice } from "../lib/bindings/AfterChoice";
   import type { Countdown } from "../lib/bindings/Countdown";
   import type { DownloadView } from "../lib/bindings/DownloadView";
+  import type { ConfirmTexts } from "../lib/bindings/ConfirmTexts";
 
   // The schedule window (M5.5): the queues on the side, the chosen queue's
   // schedule and downloads. The schedule and the number at once are saved
@@ -29,6 +31,7 @@
   let adding = $state(false);
   let newName = $state("");
   let deleting = $state(false);
+  let afterPrompt = $state<ConfirmTexts | null>(null);
 
   // The form, from the chosen queue's plan.
   let timed = $state(false);
@@ -169,16 +172,23 @@
     });
   }
 
-  /** The file or program to open after the queue (#142): Rust shows the
-   * system's picker and asks to confirm it with its path, then saves it. */
+  /** Rust owns the chosen path; this window draws the confirmation prompt. */
   async function chooseAfterOpen() {
     await run(async () => {
-      await scheduleApi.chooseAfterOpen(chosen, {
+      afterPrompt = await scheduleApi.chooseAfterOpen(chosen, {
         title: locale.t("schedule-title"),
         question: locale.t("schedule-after-open-confirm"),
         ok: locale.t("schedule-after-open-ok"),
         cancel: locale.t("schedule-cancel"),
       });
+    });
+  }
+
+  async function answerAfterOpen(confirmed: boolean) {
+    if (!afterPrompt) return;
+    afterPrompt = null;
+    await run(async () => {
+      await scheduleApi.confirmAfterOpen(confirmed);
       await load(dirty);
     });
   }
@@ -389,6 +399,16 @@
     <button class="btn end" onclick={() => void api.closeWindow()}>{locale.t("schedule-close")}</button>
   </footer>
 </main>
+
+{#if afterPrompt}
+  <ConfirmPrompt
+    title={afterPrompt.title}
+    message={afterPrompt.question}
+    okLabel={afterPrompt.ok}
+    cancelLabel={afterPrompt.cancel}
+    onanswer={answerAfterOpen}
+  />
+{/if}
 
 <style>
   .schedule {

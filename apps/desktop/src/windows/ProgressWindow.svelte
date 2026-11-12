@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import ConfirmPrompt from "../lib/components/ConfirmPrompt.svelte";
+  import { createConfirmation } from "../lib/confirm";
   import Icon from "../lib/components/Icon.svelte";
   import ColorIcon from "../lib/components/ColorIcon.svelte";
   import { isolatedName } from "../lib/fname";
@@ -32,6 +33,8 @@
   let limited = $state(false);
   let limitKb = $state(512);
   let limitSaid = $state<string | null>(null);
+  const confirmation = createConfirmation();
+  const { prompt } = confirmation;
 
   function readMore(): boolean {
     try {
@@ -168,12 +171,12 @@
   async function finished() {
     // A file that can run code opens once the user agrees (#84).
     if (openFile && !(await api.openDownload(id, false).catch(() => true))) {
-      const yes = await ask(locale.t("open-code-question", { name: d?.name ?? "" }), {
+      const yes = await confirmation.ask({
         title: locale.t("app-name"),
-        kind: "warning",
+        message: locale.t("open-code-question", { name: d?.name ?? "" }),
         okLabel: locale.t("open-code-ok"),
         cancelLabel: locale.t("confirm-cancel"),
-      }).catch(() => false);
+      });
       if (yes) await api.openDownload(id, false, true).catch(() => {});
     }
     if (openFolder) await api.openDownload(id, true).catch(() => {});
@@ -401,6 +404,7 @@
     </section>
   {/if}
 </main>
+{#if $prompt}<ConfirmPrompt {...$prompt} onanswer={confirmation.answer} />{/if}
 
 <style>
   .gone {

@@ -18,10 +18,11 @@ export const scheduleApi = {
   saveQueue: (name: string, change: PlanChange) => invoke<void>("save_queue", { name, change }),
   moveInQueue: (id: number, up: boolean) => invoke<void>("move_in_queue", { id, up }),
   startQueue: (name: string) => invoke<void>("start_queue", { name }),
-  /** «Choose a file…» (#142): Rust shows the picker and asks to confirm,
-   * then saves it; the chosen path, or null. The page sends no path. */
+  /** «Choose a file…» (#142): Rust owns the selected path; the page only confirms. */
   chooseAfterOpen: (name: string, texts: ConfirmTexts) =>
-    invoke<string | null>("choose_after_open", { name, texts }),
+    invoke<ConfirmTexts | null>("choose_after_open", { name, texts }),
+  confirmAfterOpen: (confirmed: boolean) =>
+    invoke<string | null>("confirm_after_open", { confirmed }),
   clearAfterOpen: (name: string) => invoke<void>("clear_after_open", { name }),
   /** This run only: never saved. */
   setAfter: (queue: string, choice: AfterChoice) => invoke<void>("set_after", { queue, choice }),
