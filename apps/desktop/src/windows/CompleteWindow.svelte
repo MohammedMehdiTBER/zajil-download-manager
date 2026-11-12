@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { openError } from "../lib/openError";
   import { invoke } from "@tauri-apps/api/core";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import ConfirmPrompt from "../lib/components/ConfirmPrompt.svelte";
+  import { createConfirmation } from "../lib/confirm";
   import Icon from "../lib/components/Icon.svelte";
   import ColorIcon, { nameIcon } from "../lib/components/ColorIcon.svelte";
   import FileName from "../lib/components/FileName.svelte";
@@ -22,6 +23,8 @@
   let done = $state<CompleteView | null>(null);
   let problem = $state<string | null>(null);
   let never = $state(false);
+  const confirmation = createConfirmation();
+  const { prompt } = confirmation;
 
   onMount(() => {
     if (scene) {
@@ -47,12 +50,12 @@
     problem = null;
     try {
       if (!(await api.openDownload(id, folder))) {
-        const yes = await ask(locale.t("open-code-question", { name: done?.name ?? "" }), {
+        const yes = await confirmation.ask({
           title: locale.t("app-name"),
-          kind: "warning",
+          message: locale.t("open-code-question", { name: done?.name ?? "" }),
           okLabel: locale.t("open-code-ok"),
           cancelLabel: locale.t("confirm-cancel"),
-        }).catch(() => false);
+        });
         if (!yes) return;
         await api.openDownload(id, folder, true);
       }
@@ -115,6 +118,7 @@
     <button class="btn end" onclick={() => void close()}>{locale.t("complete-close")}</button>
   </div>
 </main>
+{#if $prompt}<ConfirmPrompt {...$prompt} onanswer={confirmation.answer} />{/if}
 
 <style>
   .complete {
