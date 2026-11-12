@@ -59,7 +59,8 @@
     flex: none;
   }
   .brand-right .brand {
-    margin-inline-start: auto;
+    /* The bar itself is LTR; push the RTL label to the far right. */
+    margin-left: auto;
   }
   .brand {
     display: flex;
