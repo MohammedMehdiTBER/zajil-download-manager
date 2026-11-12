@@ -126,6 +126,9 @@ pub struct After {
     /// The window's title in the user's language, for opening it when a
     /// countdown starts.
     title: Mutex<String>,
+    /// A path chosen by Rust, awaiting the schedule window's in-app approval.
+    /// The page never supplies a path that might be executed later.
+    pending_open: Mutex<HashMap<String, (String, PathBuf)>>,
     /// Queues the user started now, outside their window (#125): the queue
     /// runner treats them as open until they have nothing left.
     pub run_now: zajil_core::queue::RunNow,
@@ -294,7 +297,7 @@ fn plan(
 }
 
 /// The texts of the confirmation, in the page's language.
-#[derive(Debug, Clone, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ConfirmTexts {
     pub title: String,
@@ -303,23 +306,22 @@ pub struct ConfirmTexts {
     pub cancel: String,
 }
 
-/// «Choose a file…» for queue `name` (#142): Rust shows the system's
-/// picker, then asks the user to confirm the file or program with its path
-/// shown, and saves it. The page never sends a path (review of #142: any
-/// page of the app could otherwise set a program to run). `None`: nothing
-/// chosen or not confirmed.
+/// «Choose a file…» for queue `name` (#142): Rust owns the file picker
+/// and keeps its chosen path. The schedule window confirms the path in an
+/// app-drawn prompt; it never sends a path back to Rust.
 #[tauri::command]
 pub async fn choose_after_open<R: tauri::Runtime>(
-    app: State<'_, App>,
+    after: State<'_, SharedAfter>,
     name: String,
     texts: ConfirmTexts,
     window: tauri::WebviewWindow<R>,
     handle: tauri::AppHandle<R>,
-) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+) -> Result<Option<ConfirmTexts>, String> {
+    use tauri_plugin_dialog::DialogExt;
     if crate::in_scene(&handle) {
         return Ok(None);
     }
+    let label = window.label().to_owned();
     let dialogs = handle.clone();
     let chosen = tokio::task::spawn_blocking(move || {
         let picked = dialogs
@@ -329,22 +331,49 @@ pub async fn choose_after_open<R: tauri::Runtime>(
             .blocking_pick_file()?
             .into_path()
             .ok()?;
-        let file = after_open_of(&picked).ok()?;
-        let sure = dialogs
-            .dialog()
-            .message(format!("{}\n\n{}", texts.question, file.display()))
-            .title(texts.title)
-            .kind(MessageDialogKind::Warning)
-            .buttons(MessageDialogButtons::OkCancelCustom(texts.ok, texts.cancel))
-            .parent(&window)
-            .blocking_show();
-        sure.then_some(file)
+        after_open_of(&picked).ok()
     })
     .await
     .map_err(crate::blocking_err)?;
     let Some(file) = chosen else {
         return Ok(None);
     };
+    let shown = file.to_string_lossy().into_owned();
+    after
+        .pending_open
+        .lock()
+        .unwrap()
+        .insert(label, (name, file));
+    Ok(Some(ConfirmTexts {
+        title: texts.title,
+        question: format!("{}\\n\\n{shown}", texts.question),
+        ok: texts.ok,
+        cancel: texts.cancel,
+    }))
+}
+
+/// Confirms or discards the path Rust selected for this schedule window.
+/// No path is accepted from the page, only the user's yes/no answer.
+#[tauri::command]
+pub async fn confirm_after_open<R: tauri::Runtime>(
+    app: State<'_, App>,
+    after: State<'_, SharedAfter>,
+    confirmed: bool,
+    window: tauri::WebviewWindow<R>,
+    handle: tauri::AppHandle<R>,
+) -> Result<Option<String>, String> {
+    let Some((name, picked)) = after
+        .pending_open
+        .lock()
+        .unwrap()
+        .remove(window.label())
+    else {
+        return Ok(None);
+    };
+    if !confirmed {
+        return Ok(None);
+    }
+    let file = after_open_of(&picked)?;
     let shown = file.to_string_lossy().into_owned();
     crate::downloads::change(&app, &handle, move |q| {
         q.queue_mut(&name)
