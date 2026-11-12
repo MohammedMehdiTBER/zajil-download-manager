@@ -346,7 +346,7 @@ pub async fn choose_after_open<R: tauri::Runtime>(
         .insert(label, (name, file));
     Ok(Some(ConfirmTexts {
         title: texts.title,
-        question: format!("{}\\n\\n{shown}", texts.question),
+        question: format!("{}\n\n{shown}", texts.question),
         ok: texts.ok,
         cancel: texts.cancel,
     }))
