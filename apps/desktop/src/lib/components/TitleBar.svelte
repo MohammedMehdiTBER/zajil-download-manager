@@ -23,7 +23,7 @@
 <!-- "deep": the logo and the name drag too; the buttons do not. -->
 <!-- Laid out left to right, the sides chosen above; the brand reads in
      the language's own direction. -->
-<div class="titlebar" class:mac class:buttons-right={buttonsRight} class:brand-right={brandRight} dir="ltr" data-tauri-drag-region="deep">
+<div class="titlebar" class:brand-right={brandRight} dir="ltr" data-tauri-drag-region="deep">
   <span class="brand" dir={locale.dir}>
     <Mark size={18} />
     <span class="name">{locale.t(titleKey)}</span>
