@@ -3,7 +3,7 @@
   import { onMount, tick } from "svelte";
   import { openError } from "./lib/openError";
   import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
-  import { message, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import Tree, { type Filter, type View } from "./lib/components/Tree.svelte";
   import { inSection } from "./lib/sections";
   import Toolbar, { type ToolAction } from "./lib/components/Toolbar.svelte";
