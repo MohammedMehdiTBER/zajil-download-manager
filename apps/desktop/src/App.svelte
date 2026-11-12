@@ -12,6 +12,7 @@
   import { MENU_BAR, commandKey } from "./lib/menus";
   import MenuBar from "./lib/components/MenuBar.svelte";
   import TitleBar from "./lib/components/TitleBar.svelte";
+  import WindowShell from "./lib/WindowShell.svelte";
   import ContextMenu from "./lib/components/ContextMenu.svelte";
   import DeleteAsk from "./lib/components/DeleteAsk.svelte";
   import Settings from "./lib/components/Settings.svelte";
@@ -1049,31 +1050,36 @@ import { patchRows } from "./lib/progressRows";
 {#if NamesPage}
   <NamesPage />
 {:else if windowScene && windowSceneName}
-  <div class="scene" class:mac={onMac()}>
-    {#if windowSceneName === "complete"}<CompleteWindow scene={windowScene.complete} />
-    {:else if windowSceneName === "schedule"}<ScheduleWindow scene={windowScene.schedule} />
-    {:else if windowSceneName === "batch"}<BatchWindow scene={windowScene.batch} />
-    {:else}<GrabWindow scene={windowScene.grab} />{/if}
+  <div class="scene">
+    {#if windowSceneName === "complete"}
+      <WindowShell component={CompleteWindow} componentProps={{ scene: windowScene.complete }} titleKey="complete-title" />
+    {:else if windowSceneName === "schedule"}
+      <WindowShell component={ScheduleWindow} componentProps={{ scene: windowScene.schedule }} titleKey="schedule-title" />
+    {:else if windowSceneName === "batch"}
+      <WindowShell component={BatchWindow} componentProps={{ scene: windowScene.batch }} titleKey="batch-title" />
+    {:else}
+      <WindowShell component={GrabWindow} componentProps={{ scene: windowScene.grab }} titleKey="grab-title" />
+    {/if}
   </div>
 {:else if videoScene}
-  <div class="scene" class:mac={onMac()}><VideoWindow scene={videoScene} /></div>
+  <div class="scene"><WindowShell component={VideoWindow} componentProps={{ scene: videoScene }} titleKey="video-title" /></div>
 {:else if linkScene}
-  <div class="scene" class:mac={onMac()}><AddLink url="https://cdn.example.org/courses/rust/part-2.mp4" fromClipboard={true} onok={() => {}} oncancel={() => {}} /></div>
+  <div class="scene"><WindowShell component={AddLink} componentProps={{ url: "https://cdn.example.org/courses/rust/part-2.mp4", fromClipboard: true, onok: () => {}, oncancel: () => {} }} titleKey="addlink-title" /></div>
 {:else if progressScene}
-  <div class="scene" class:mac={onMac()}><ProgressWindow id={2} /></div>
+  <div class="scene"><WindowShell component={ProgressWindow} componentProps={{ id: 2 }} titleKey="progress-title" /></div>
 {:else if addScene}
-  <div class="scene" class:mac={onMac()}><AddDialog
-    url={addScene.url}
-    probe={addScene.probe}
-    error={null}
-    busy={false}
-    queues={snapshot.queues}
-    categories={snapshot.categories}
-    onadd={() => {}}
-    oncancel={() => {}}
-    onchoosefolder={async () => null}
-    onnewcategory={() => {}}
-  /></div>
+  <div class="scene"><WindowShell component={AddDialog} componentProps={{
+    url: addScene.url,
+    probe: addScene.probe,
+    error: null,
+    busy: false,
+    queues: snapshot.queues,
+    categories: snapshot.categories,
+    onadd: () => {},
+    oncancel: () => {},
+    onchoosefolder: async () => null,
+    onnewcategory: () => {},
+  }} titleKey="info-title" /></div>
 {:else}
   <div class="window">
     <header>
@@ -1179,15 +1185,10 @@ import { patchRows } from "./lib/progressRows";
 {/if}
 
 <style>
-  /* A window scene (the add, link and progress windows, drawn here for
-     the screenshots): on macOS the main window's own title bar is hidden
-     (#118), and the real windows have the system's above their content. */
+  /* Test scenes use the same custom title bar as their real windows. */
   .scene {
     height: 100%;
-  }
-  .scene.mac {
-    box-sizing: border-box;
-    padding-top: 28px;
+    min-height: 0;
   }
   .window {
     position: relative;
