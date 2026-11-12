@@ -362,12 +362,7 @@ pub async fn confirm_after_open<R: tauri::Runtime>(
     window: tauri::WebviewWindow<R>,
     handle: tauri::AppHandle<R>,
 ) -> Result<Option<String>, String> {
-    let Some((name, picked)) = after
-        .pending_open
-        .lock()
-        .unwrap()
-        .remove(window.label())
-    else {
+    let Some((name, picked)) = after.pending_open.lock().unwrap().remove(window.label()) else {
         return Ok(None);
     };
     if !confirmed {
