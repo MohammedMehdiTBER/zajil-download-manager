@@ -50,7 +50,7 @@
   }
 </script>
 
-<div class="scrim" dir={locale.dir} onclick={(event) => event.target === event.currentTarget && onanswer(false)}>
+<div class="scrim" dir={locale.dir}>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
   <div
     class="dialog"
