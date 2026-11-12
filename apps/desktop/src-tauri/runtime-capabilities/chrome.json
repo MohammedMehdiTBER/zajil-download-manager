@@ -1,0 +1,25 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "window-chrome",
+  "description": "The app-owned secondary windows draw their own title bars; this capability lets those windows drag, minimize, maximize, restore and close themselves. Other permissions remain in their individual capabilities.",
+  "windows": [
+    "add-link",
+    "add-link-*",
+    "add-info",
+    "add-info-*",
+    "progress-*",
+    "settings",
+    "schedule",
+    "complete-*",
+    "batch",
+    "grab",
+    "video"
+  ],
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-close"
+  ]
+}
